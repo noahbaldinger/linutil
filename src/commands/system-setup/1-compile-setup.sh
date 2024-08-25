@@ -1,5 +1,7 @@
 #!/bin/sh -e
 
+. ../common-script.sh
+
 # Check if the home directory and linuxtoolbox folder exist, create them if they don't
 LINUXTOOLBOXDIR="$HOME/linuxtoolbox"
 
@@ -31,13 +33,13 @@ installDepend() {
             if ! grep -q "^\s*\[multilib\]" /etc/pacman.conf; then
                 echo "[multilib]" | sudo tee -a /etc/pacman.conf
                 echo "Include = /etc/pacman.d/mirrorlist" | sudo tee -a /etc/pacman.conf
-                sudo "$PACKAGER" -Sy
+                sudo "$PACKAGER" -Syu
             else
                 echo "Multilib is already enabled."
             fi
             if ! command_exists yay && ! command_exists paru; then
                 echo "Installing yay as AUR helper..."
-                sudo "$PACKAGER" --noconfirm -S base-devel
+                sudo "$PACKAGER" -S --needed --noconfirm base-devel
                 cd /opt && sudo git clone https://aur.archlinux.org/yay-git.git && sudo chown -R "$USER":"$USER" ./yay-git
                 cd yay-git && makepkg --noconfirm -si
             else
@@ -51,14 +53,14 @@ installDepend() {
                 echo "No AUR helper found. Please install yay or paru."
                 exit 1
             fi
-            "$AUR_HELPER" --noconfirm -S "$DEPENDENCIES"
+            "$AUR_HELPER" -S --needed --noconfirm "$DEPENDENCIES"
             ;;
-        apt)
+        apt-get|nala)
             COMPILEDEPS='build-essential'
             sudo "$PACKAGER" update
             sudo dpkg --add-architecture i386
             sudo "$PACKAGER" update
-            sudo "$PACKAGER" install -y "$DEPENDENCIES" $COMPILEDEPS 
+            sudo "$PACKAGER" install -y $DEPENDENCIES $COMPILEDEPS 
             ;;
         dnf)
             COMPILEDEPS='@development-tools'
@@ -74,7 +76,7 @@ installDepend() {
             sudo "$PACKAGER" --non-interactive install libgcc_s1-gcc7-32bit glibc-devel-32bit
             ;;
         *)
-            sudo "$PACKAGER" install -y "$DEPENDENCIES"
+            sudo "$PACKAGER" install -y $DEPENDENCIES # Fixed bug where no packages found on debian-based
             ;;
     esac
 }

@@ -1,11 +1,13 @@
 #!/bin/sh -e
 
+. ../common-script.sh
+
 setupAlacritty() {
     echo "Install Alacritty if not already installed..."
     if ! command_exists alacritty; then
         case ${PACKAGER} in
             pacman)
-                sudo ${PACKAGER} -S --noconfirm alacritty
+                sudo ${PACKAGER} -S --needed --noconfirm alacritty
                 ;;
             *)
                 sudo ${PACKAGER} install -y alacritty

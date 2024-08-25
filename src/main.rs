@@ -1,6 +1,8 @@
 mod float;
-mod list;
+mod floating_text;
 mod running_command;
+pub mod state;
+mod tabs;
 mod theme;
 
 use std::{
@@ -8,42 +10,52 @@ use std::{
     time::Duration,
 };
 
+use crate::theme::Theme;
 use clap::Parser;
 use crossterm::{
     cursor::RestorePosition,
-    event::{self, DisableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, Event, KeyEventKind},
     style::ResetColor,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use list::CustomList;
+use include_dir::include_dir;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
-use running_command::RunningCommand;
-use theme::set_theme;
+use state::AppState;
+use tempdir::TempDir;
 
-/// This is a binary :), Chris, change this to update the documentation on -h
+// Linux utility toolbox
 #[derive(Debug, Parser)]
 struct Args {
-    /// Enable compatibility mode (disable icons and RGB colors)
-    #[arg(short, long, default_value_t = false)]
-    compat: bool,
+    #[arg(short, long, value_enum)]
+    #[arg(default_value_t = Theme::Default)]
+    #[arg(help = "Set the theme to use in the application")]
+    theme: Theme,
+    #[arg(long, default_value_t = false)]
+    #[clap(help = "Show all available options, disregarding compatibility checks (UNSAFE)")]
+    override_validation: bool,
 }
 
 fn main() -> std::io::Result<()> {
     let args = Args::parse();
-    if args.compat {
-        set_theme(0);
-    }
+
+    let commands_dir = include_dir!("src/commands");
+    let temp_dir: TempDir = TempDir::new("linutil_scripts").unwrap();
+    commands_dir
+        .extract(temp_dir.path())
+        .expect("Failed to extract the saved directory");
+
+    let mut state = AppState::new(args.theme, temp_dir.path(), args.override_validation);
 
     stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.clear()?;
 
-    run(&mut terminal)?;
+    run(&mut terminal, &mut state)?;
 
     // restore terminal
     disable_raw_mode()?;
@@ -55,20 +67,9 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn run<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
-    let mut command_opt: Option<RunningCommand> = None;
-
-    let mut custom_list = CustomList::new();
+fn run<B: Backend>(terminal: &mut Terminal<B>, state: &mut AppState) -> io::Result<()> {
     loop {
-        // Always redraw
-        terminal
-            .draw(|frame| {
-                custom_list.draw(frame, frame.size());
-                if let Some(ref mut command) = &mut command_opt {
-                    command.draw(frame);
-                }
-            })
-            .unwrap();
+        terminal.draw(|frame| state.draw(frame)).unwrap();
 
         // Wait for an event
         if !event::poll(Duration::from_millis(10))? {
@@ -82,17 +83,9 @@ fn run<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
             if key.kind != KeyEventKind::Press && key.kind != KeyEventKind::Repeat {
                 continue;
             }
-            if let Some(ref mut command) = command_opt {
-                if command.handle_key_event(&key) {
-                    command_opt = None;
-                }
-            } else {
-                if key.code == KeyCode::Char('q') {
-                    return Ok(());
-                }
-                if let Some(cmd) = custom_list.handle_key(key) {
-                    command_opt = Some(RunningCommand::new(cmd));
-                }
+
+            if !state.handle_key(&key) {
+                return Ok(());
             }
         }
     }
