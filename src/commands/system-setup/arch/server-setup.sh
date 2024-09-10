@@ -182,7 +182,7 @@ keymap () {
     echo -ne "
     Please select key board layout from this list"
     # These are default key maps as presented in official arch repo archinstall
-    options=(us by ca cf cz de dk es et fa fi fr gr hu il it lt lv mk nl no pl ro ru sg ua uk)
+    options=(us by ca cf cz de dk es et fa fi fr gr hu il it lt lv mk nl no pl ro ru se sg ua uk)
 
     select_option "${options[@]}"
     keymap=${options[$?]}
@@ -670,7 +670,4 @@ sed -i 's/^%wheel ALL=(ALL:ALL) NOPASSWD: ALL/# %wheel ALL=(ALL:ALL) NOPASSWD: A
 # Add sudo rights
 sed -i 's/^# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/' /etc/sudoers
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
-
-# Replace in the same state
-cd "$(pwd)" || exit
 EOF
